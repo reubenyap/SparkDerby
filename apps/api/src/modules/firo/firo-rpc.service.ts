@@ -1,116 +1,99 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { FiroAdapter } from '@sparkderby/shared';
+import { MockFiroAdapter } from './adapters/mock-firo.adapter';
+import { JsonRpcFiroAdapter, JsonRpcConfig } from './adapters/jsonrpc-firo.adapter';
 
-interface SparkMint {
-  txid: string;
-  amount: number;
-  sparkAddress: string;
-  memo: string;
-  confirmations: number;
-  blockHash?: string;
-  blockHeight?: number;
-}
+export const FIRO_ADAPTER = Symbol('FIRO_ADAPTER');
 
-interface SparkTransaction {
-  txid: string;
-  amount: number;
-  confirmations: number;
-  instantlock: boolean;
-  blockhash?: string;
-  blockheight?: number;
-  time: number;
-}
-
-interface SpendSparkParams {
-  outputs: Array<{
-    address: string;
-    amount: number;
-    memo?: string;
-  }>;
-}
-
+/**
+ * FiroRpcService – factory/wrapper that creates the correct FiroAdapter
+ * based on configuration and exposes it to the rest of the application.
+ *
+ * When FIRO_RPC_HOST is empty or set to 'mock', uses MockFiroAdapter.
+ * Otherwise creates a JsonRpcFiroAdapter pointing at the real daemon.
+ */
 @Injectable()
-export class FiroRpcService implements OnModuleInit {
+export class FiroRpcService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(FiroRpcService.name);
-  private mockBlockHeight = 500000;
+  private _adapter!: FiroAdapter;
 
   constructor(private readonly configService: ConfigService) {}
 
-  async onModuleInit(): Promise<void> {
-    this.logger.warn('Running with MOCK Firo RPC adapter');
-    const host = this.configService.get<string>('firo.rpcHost');
-    const port = this.configService.get<number>('firo.rpcPort');
-    this.logger.log(`Mock Firo RPC configured for ${host}:${port}`);
+  /** The active adapter instance */
+  get adapter(): FiroAdapter {
+    return this._adapter;
   }
+
+  async onModuleInit(): Promise<void> {
+    const host = this.configService.get<string>('firo.rpcHost', '');
+    const useMock = !host || host === 'mock' || host === '127.0.0.1';
+
+    if (useMock && !this.configService.get<string>('FIRO_FORCE_REAL')) {
+      this._adapter = new MockFiroAdapter();
+      this.logger.warn(`Using MockFiroAdapter (host="${host}")`);
+    } else {
+      const config: JsonRpcConfig = {
+        host,
+        port: this.configService.get<number>('firo.rpcPort', 8888),
+        user: this.configService.get<string>('firo.rpcUser', 'firouser'),
+        password: this.configService.get<string>('firo.rpcPassword', 'firopass'),
+        timeout: this.configService.get<number>('firo.rpcTimeout', 30000),
+      };
+      this._adapter = new JsonRpcFiroAdapter(config);
+      this.logger.log(`Using JsonRpcFiroAdapter → ${host}:${config.port}`);
+    }
+
+    await this._adapter.connect();
+    const alive = await this._adapter.ping();
+    this.logger.log(`Firo adapter "${this._adapter.name}" connected, ping=${alive}`);
+  }
+
+  async onModuleDestroy(): Promise<void> {
+    if (this._adapter) {
+      await this._adapter.disconnect();
+    }
+  }
+
+  /* ── Convenience pass-through methods for backward compatibility ───── */
 
   async ping(): Promise<boolean> {
-    this.logger.debug('Mock ping');
-    return true;
+    return this._adapter.ping();
   }
 
-  async getBlockchainInfo(): Promise<{ blocks: number; bestblockhash: string }> {
-    this.mockBlockHeight++;
-    return {
-      blocks: this.mockBlockHeight,
-      bestblockhash: this.generateMockHash(),
-    };
+  async getBlockchainInfo() {
+    return this._adapter.getBlockchainInfo();
   }
 
-  async getBlockHash(height: number): Promise<string> {
-    return this.generateMockHash();
+  async getBlockHash(height: number) {
+    return this._adapter.getBlockHash(height);
   }
 
-  async getNewSparkAddress(_memo?: string): Promise<string> {
-    const chars = '0123456789abcdef';
-    let addr = 'sm1mock';
-    for (let i = 0; i < 40; i++) {
-      addr += chars[Math.floor(Math.random() * chars.length)];
-    }
-    return addr;
+  async getNewSparkAddress(memo?: string) {
+    return this._adapter.getNewSparkAddress(memo);
   }
 
-  async listSparkMints(_includeUsed = false): Promise<SparkMint[]> {
-    // Mock returns empty - no real transactions in dev
-    return [];
+  async listSparkMints(includeUsed = false) {
+    return this._adapter.listSparkMints(includeUsed);
   }
 
-  async listUnspentSparkMints(): Promise<SparkMint[]> {
-    return [];
+  async listUnspentSparkMints() {
+    return this._adapter.listUnspentSparkMints();
   }
 
-  async getTransaction(txid: string): Promise<SparkTransaction> {
-    return {
-      txid,
-      amount: 1.0,
-      confirmations: 6,
-      instantlock: true,
-      blockhash: this.generateMockHash(),
-      blockheight: this.mockBlockHeight,
-      time: Math.floor(Date.now() / 1000),
-    };
+  async getTransaction(txid: string) {
+    return this._adapter.getTransaction(txid);
   }
 
-  async getSparkBalance(): Promise<{ available: number; pending: number }> {
-    return { available: 100.0, pending: 0.0 };
+  async getSparkBalance() {
+    return this._adapter.getSparkBalance();
   }
 
-  async spendSpark(params: SpendSparkParams): Promise<{ txid: string }> {
-    const totalOut = params.outputs.reduce((sum, o) => sum + o.amount, 0);
-    this.logger.log(`Mock spendSpark: ${params.outputs.length} outputs, total: ${totalOut} FIRO`);
-    return { txid: this.generateMockHash() };
+  async spendSpark(params: { outputs: Array<{ address: string; amount: number; memo?: string }> }) {
+    return this._adapter.spendSpark(params.outputs);
   }
 
-  async resolveSparkName(name: string): Promise<string | null> {
-    this.logger.debug(`Mock resolveSparkName: ${name}`);
-    return null;
-  }
-
-  private generateMockHash(): string {
-    const chars = '0123456789abcdef';
-    let hash = '';
-    for (let i = 0; i < 64; i++) {
-      hash += chars[Math.floor(Math.random() * chars.length)];
-    }
-    return hash;
+  async resolveSparkName(name: string) {
+    return this._adapter.resolveSparkName(name);
   }
 }

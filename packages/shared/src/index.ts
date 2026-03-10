@@ -3,6 +3,7 @@ export * from './types/player';
 export * from './types/action';
 export * from './types/settlement';
 export * from './types/firo';
+export * from './types/firo-adapter';
 export * from './types/websocket';
 export * from './constants/economics';
 export * from './constants/archetypes';
