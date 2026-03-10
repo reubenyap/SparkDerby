@@ -1,0 +1,69 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: sparkderby
+      POSTGRES_USER: spark
+      POSTGRES_PASSWORD: spark
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U spark -d sparkderby"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    ports:
+      - "3001:3001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      DATABASE_HOST: postgres
+      DATABASE_PORT: 5432
+      DATABASE_NAME: sparkderby
+      DATABASE_USER: spark
+      DATABASE_PASSWORD: spark
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      API_PORT: 3001
+      FIRO_RPC_HOST: host.docker.internal
+      FIRO_RPC_PORT: 8888
+      FIRO_RPC_USER: firouser
+      FIRO_RPC_PASSWORD: firopass
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    ports:
+      - "3000:3000"
+    depends_on:
+      - api
+    environment:
+      NEXT_PUBLIC_API_URL: http://api:3001
+      NEXT_PUBLIC_WS_URL: ws://api:3001/ws
+
+volumes:
+  pgdata:
+  redisdata:
