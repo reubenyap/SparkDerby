@@ -7,9 +7,11 @@ export class RedisService {
   private readonly client: Redis;
 
   constructor(private readonly configService: ConfigService) {
+    const password = this.configService.get<string>('redis.password');
     this.client = new Redis({
       host: this.configService.get<string>('redis.host', 'localhost'),
       port: this.configService.get<number>('redis.port', 6379),
+      password: password || undefined,
       maxRetriesPerRequest: 3,
     });
   }

@@ -1,24 +1,36 @@
 services:
   postgres:
     image: postgres:16-alpine
+    # Do NOT expose to host in production; only for local dev
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     environment:
-      POSTGRES_DB: sparkderby
-      POSTGRES_USER: spark
-      POSTGRES_PASSWORD: spark
+      POSTGRES_DB: ${DATABASE_NAME:-sparkderby}
+      POSTGRES_USER: ${DATABASE_USER:-spark}
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD:?Set DATABASE_PASSWORD in .env}
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U spark -d sparkderby"]
+      test: ["CMD-SHELL", "pg_isready -U ${DATABASE_USER:-spark} -d ${DATABASE_NAME:-sparkderby}"]
       interval: 5s
       timeout: 5s
       retries: 5
 
   redis:
     image: redis:7-alpine
+    # Bind to localhost only; require password if REDIS_PASSWORD is set
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"
+    command: >
+      sh -c '
+        if [ -n "$$REDIS_PASSWORD" ]; then
+          redis-server --requirepass "$$REDIS_PASSWORD"
+        else
+          redis-server
+        fi
+      '
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
     volumes:
       - redisdata:/data
     healthcheck:
@@ -32,37 +44,46 @@ services:
       context: .
       dockerfile: apps/api/Dockerfile
     ports:
-      - "3001:3001"
+      - "127.0.0.1:3001:3001"
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
     environment:
+      NODE_ENV: ${NODE_ENV:-development}
       DATABASE_HOST: postgres
       DATABASE_PORT: 5432
-      DATABASE_NAME: sparkderby
-      DATABASE_USER: spark
-      DATABASE_PASSWORD: spark
+      DATABASE_NAME: ${DATABASE_NAME:-sparkderby}
+      DATABASE_USER: ${DATABASE_USER:-spark}
+      DATABASE_PASSWORD: ${DATABASE_PASSWORD:?Set DATABASE_PASSWORD in .env}
       REDIS_HOST: redis
       REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
       API_PORT: 3001
-      FIRO_RPC_HOST: host.docker.internal
-      FIRO_RPC_PORT: 8888
-      FIRO_RPC_USER: firouser
-      FIRO_RPC_PASSWORD: firopass
+      API_CORS_ORIGIN: ${API_CORS_ORIGIN:-http://localhost:3000}
+      FIRO_RPC_HOST: ${FIRO_RPC_HOST:-host.docker.internal}
+      FIRO_RPC_PORT: ${FIRO_RPC_PORT:-8888}
+      FIRO_RPC_USER: ${FIRO_RPC_USER:-firouser}
+      FIRO_RPC_PASSWORD: ${FIRO_RPC_PASSWORD:-firopass}
+      SESSION_SECRET: ${SESSION_SECRET:?Set SESSION_SECRET in .env}
+      ADMIN_API_KEY: ${ADMIN_API_KEY:-}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_CHANNEL_ID: ${TELEGRAM_CHANNEL_ID:-}
+      TREASURY_SPARK_ADDRESS: ${TREASURY_SPARK_ADDRESS:-}
+      RESERVE_SPARK_ADDRESS: ${RESERVE_SPARK_ADDRESS:-}
 
   web:
     build:
       context: .
       dockerfile: apps/web/Dockerfile
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3000:3000"
     depends_on:
       - api
     environment:
-      NEXT_PUBLIC_API_URL: http://api:3001
-      NEXT_PUBLIC_WS_URL: ws://api:3001/ws
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://api:3001}
+      NEXT_PUBLIC_WS_URL: ${NEXT_PUBLIC_WS_URL:-ws://api:3001/ws}
 
 volumes:
   pgdata:

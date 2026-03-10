@@ -1,6 +1,8 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { ScheduleModule } from '@nestjs/schedule';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { APP_GUARD } from '@nestjs/core';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { DatabaseModule } from './database/database.module';
 import { RaceModule } from './modules/race/race.module';
@@ -23,6 +25,10 @@ import configuration from './config/configuration';
     }),
     EventEmitterModule.forRoot(),
     ScheduleModule.forRoot(),
+    ThrottlerModule.forRoot([{
+      ttl: 60000,  // 60 seconds
+      limit: 100,  // 100 requests per minute per IP
+    }]),
     DatabaseModule,
     RaceModule,
     PlayerModule,
@@ -34,6 +40,9 @@ import configuration from './config/configuration';
     AdminModule,
     AuditModule,
     BackingModule,
+  ],
+  providers: [
+    { provide: APP_GUARD, useClass: ThrottlerGuard },
   ],
 })
 export class AppModule {}

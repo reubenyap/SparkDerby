@@ -1,14 +1,16 @@
 import {
   Controller, Post, Get, Param, Body, HttpCode, Logger,
-  BadRequestException,
+  BadRequestException, UseGuards,
 } from '@nestjs/common';
 import { RaceService } from '../race/race.service';
 import { SettlementService } from '../settlement/settlement.service';
 import { FiroRpcService } from '../firo/firo-rpc.service';
 import { ReconciliationService } from '../firo/reconciliation.service';
 import { ChainWatcherService } from '../firo/chain-watcher.service';
+import { AdminApiKeyGuard } from '../../common/guards/admin-api-key.guard';
 
 @Controller('admin')
+@UseGuards(AdminApiKeyGuard)
 export class AdminController {
   private readonly logger = new Logger(AdminController.name);
 

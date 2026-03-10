@@ -11,6 +11,7 @@ import { Response } from 'express';
 @Catch()
 export class AllExceptionsFilter implements ExceptionFilter {
   private readonly logger = new Logger(AllExceptionsFilter.name);
+  private readonly isProd = process.env.NODE_ENV === 'production';
 
   catch(exception: unknown, host: ArgumentsHost): void {
     const ctx = host.switchToHttp();
@@ -22,10 +23,13 @@ export class AllExceptionsFilter implements ExceptionFilter {
     if (exception instanceof HttpException) {
       status = exception.getStatus();
       const exResponse = exception.getResponse();
-      message = typeof exResponse === 'string' ? exResponse : (exResponse as Record<string, unknown>).message as string;
+      message = typeof exResponse === 'string'
+        ? exResponse
+        : (exResponse as Record<string, unknown>).message as string;
     } else if (exception instanceof Error) {
       this.logger.error(`Unhandled exception: ${exception.message}`, exception.stack);
-      message = exception.message;
+      // Never leak internal error details to clients in production
+      message = this.isProd ? 'Internal server error' : exception.message;
     }
 
     response.status(status).json({
