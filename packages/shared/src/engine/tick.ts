@@ -1,4 +1,4 @@
-import { FINISH_LINE } from '../constants/race';
+import { FINISH_LINE, MIN_SPEED } from '../constants/race';
 import { ACTION_DEFINITIONS } from '../constants/actions';
 import { ActionType } from '../types/action';
 import {
@@ -198,7 +198,7 @@ export function processTick(input: TickInput): TickOutput {
       }
     }
 
-    move = Math.max(move, 0);
+    move = Math.max(move, MIN_SPEED);
     racer.position = Math.min(racer.position + move, FINISH_LINE);
     racer.stamina = Math.max(0, racer.stamina - getStaminaDecay(racer.archetype));
 

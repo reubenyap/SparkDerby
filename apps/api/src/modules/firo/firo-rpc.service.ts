@@ -27,7 +27,7 @@ export class FiroRpcService implements OnModuleInit, OnModuleDestroy {
 
   async onModuleInit(): Promise<void> {
     const host = this.configService.get<string>('firo.rpcHost', '');
-    const useMock = !host || host === 'mock' || host === '127.0.0.1';
+    const useMock = !host || host === 'mock';
 
     if (useMock && !this.configService.get<string>('FIRO_FORCE_REAL')) {
       this._adapter = new MockFiroAdapter();
