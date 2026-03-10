@@ -97,15 +97,16 @@ export class BackingService {
     });
     await this.backingRepo.save(backing);
 
-    // Update racer totals
+    // Update racer totals (parameterized to prevent SQL injection)
     await this.racerRepo
       .createQueryBuilder()
       .update()
       .set({
-        totalBacked: () => `total_backed + ${amount}`,
-        backerCount: () => `backer_count + 1`,
+        totalBacked: () => 'total_backed + :backingAmount',
+        backerCount: () => 'backer_count + 1',
       })
       .where('id = :id', { id: racerId })
+      .setParameter('backingAmount', amount)
       .execute();
 
     this.logger.log(

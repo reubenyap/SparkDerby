@@ -8,10 +8,14 @@ import {
   ConnectedSocket,
 } from '@nestjs/websockets';
 import { Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { Server, Socket } from 'socket.io';
 
 @WebSocketGateway({
-  cors: { origin: '*' },
+  cors: {
+    origin: process.env.API_CORS_ORIGIN || 'http://localhost:3000',
+    credentials: true,
+  },
   namespace: '/ws',
 })
 export class RaceGateway implements OnGatewayConnection, OnGatewayDisconnect {

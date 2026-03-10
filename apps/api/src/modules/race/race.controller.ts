@@ -15,7 +15,9 @@ export class RaceController {
     @Query('page') page = 1,
     @Query('limit') limit = 20,
   ) {
-    return this.raceService.getRaceHistory(Number(page), Number(limit));
+    const safePage = Math.max(1, Math.floor(Number(page) || 1));
+    const safeLimit = Math.min(100, Math.max(1, Math.floor(Number(limit) || 20)));
+    return this.raceService.getRaceHistory(safePage, safeLimit);
   }
 
   @Get(':raceId')
