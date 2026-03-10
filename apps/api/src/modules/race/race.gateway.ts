@@ -8,8 +8,8 @@ import {
   ConnectedSocket,
 } from '@nestjs/websockets';
 import { Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { Server, Socket } from 'socket.io';
+import { PlayerService } from '../player/player.service';
 
 @WebSocketGateway({
   cors: {
@@ -24,19 +24,51 @@ export class RaceGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   private readonly logger = new Logger(RaceGateway.name);
 
-  handleConnection(client: Socket): void {
-    this.logger.log(`Client connected: ${client.id}`);
+  constructor(private readonly playerService: PlayerService) {}
+
+  async handleConnection(client: Socket): Promise<void> {
+    const token =
+      (client.handshake.auth?.token as string) ||
+      (client.handshake.headers?.['x-session-token'] as string);
+
+    if (!token) {
+      this.logger.warn(`Client ${client.id} rejected: no session token`);
+      client.emit('error', { message: 'Authentication required' });
+      client.disconnect(true);
+      return;
+    }
+
+    const player = await this.playerService.findBySessionToken(token);
+    if (!player) {
+      this.logger.warn(`Client ${client.id} rejected: invalid session token`);
+      client.emit('error', { message: 'Invalid or expired session token' });
+      client.disconnect(true);
+      return;
+    }
+
+    (client as unknown as Record<string, unknown>)['player'] = player;
+    this.logger.log(`Client connected: ${client.id} (player: ${player.id})`);
   }
 
   handleDisconnect(client: Socket): void {
     this.logger.log(`Client disconnected: ${client.id}`);
   }
 
+  private static readonly UUID_RE =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
   @SubscribeMessage('subscribe_race')
   handleSubscribeRace(
     @MessageBody() data: { raceId: string },
     @ConnectedSocket() client: Socket,
   ): void {
+    if (!(client as unknown as Record<string, unknown>)['player']) {
+      return;
+    }
+    if (!data?.raceId || !RaceGateway.UUID_RE.test(data.raceId)) {
+      client.emit('error', { message: 'Invalid race ID' });
+      return;
+    }
     client.join(`race:${data.raceId}`);
     this.logger.log(`Client ${client.id} subscribed to race ${data.raceId}`);
   }

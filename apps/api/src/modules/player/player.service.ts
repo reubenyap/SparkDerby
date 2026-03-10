@@ -17,7 +17,10 @@ export class PlayerService {
     private readonly sessionRepo: Repository<BrowserSessionEntity>,
   ) {}
 
-  async identifyPlayer(dto: IdentifyDto) {
+  async identifyPlayer(
+    dto: IdentifyDto,
+    meta?: { ip?: string; userAgent?: string },
+  ) {
     const sparkAddress = dto.sparkAddress;
 
     let player = await this.playerRepo.findOne({
@@ -47,6 +50,8 @@ export class PlayerService {
       playerId: player.id,
       sessionToken,
       expiresAt,
+      ipAddress: meta?.ip || null,
+      userAgent: meta?.userAgent || null,
     });
     await this.sessionRepo.save(session);
 
