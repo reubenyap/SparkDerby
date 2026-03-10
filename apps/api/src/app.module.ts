@@ -12,6 +12,7 @@ import { BroadcastModule } from './modules/broadcast/broadcast.module';
 import { TelegramModule } from './modules/telegram/telegram.module';
 import { AdminModule } from './modules/admin/admin.module';
 import { AuditModule } from './modules/audit/audit.module';
+import { BackingModule } from './modules/backing/backing.module';
 import configuration from './config/configuration';
 
 @Module({
@@ -32,6 +33,7 @@ import configuration from './config/configuration';
     TelegramModule,
     AdminModule,
     AuditModule,
+    BackingModule,
   ],
 })
 export class AppModule {}

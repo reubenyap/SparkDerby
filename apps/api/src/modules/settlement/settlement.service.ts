@@ -98,10 +98,13 @@ export class SettlementService {
       const finishOrder = this.buildFinishOrder(race.racers);
       this.logger.log(`Finish order: ${finishOrder.map(f => `${f.place}. ${f.name}`).join(', ')}`);
 
-      const backingEntities = await this.backingRepo.find({ where: { raceId } });
+      const backingEntities = await this.backingRepo.find({
+        where: { raceId },
+        relations: ['player'],
+      });
       const backings: BackingEntry[] = backingEntities.map(b => ({
         playerId: b.playerId || 'anonymous',
-        sparkAddress: '',
+        sparkAddress: b.payoutAddress || b.player?.sparkAddress || '',
         racerId: b.racerId,
         amount: parseFloat(b.poolAmount),
       }));

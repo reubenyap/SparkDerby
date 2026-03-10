@@ -33,6 +33,9 @@ export class BackingEntity {
   @Column({ name: 'treasury_amount', type: 'numeric', precision: 18, scale: 8 })
   treasuryAmount!: string;
 
+  @Column({ name: 'payout_address', type: 'varchar', length: 160 })
+  payoutAddress!: string;
+
   @Column({ name: 'tick_received', type: 'smallint' })
   tickReceived!: number;
 

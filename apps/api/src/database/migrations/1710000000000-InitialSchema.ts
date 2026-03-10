@@ -151,6 +151,7 @@ export class InitialSchema1710000000000 implements MigrationInterface {
         amount NUMERIC(18,8) NOT NULL,
         pool_amount NUMERIC(18,8) NOT NULL,
         treasury_amount NUMERIC(18,8) NOT NULL,
+        payout_address VARCHAR(160) NOT NULL,
         tick_received SMALLINT NOT NULL,
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       )
