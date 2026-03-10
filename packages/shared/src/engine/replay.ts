@@ -54,6 +54,9 @@ export function verifyReplayLog(
   });
 
   // Step 3: Compare tick seeds
+  if (result.ticks.length !== log.ticks.length) {
+    return { valid: false, reason: `Tick count mismatch: expected ${result.ticks.length}, got ${log.ticks.length}` };
+  }
   for (let i = 0; i < result.ticks.length; i++) {
     if (result.ticks[i].seed !== log.ticks[i].seed) {
       return { valid: false, reason: `Tick ${i + 1} seed mismatch` };
@@ -61,6 +64,9 @@ export function verifyReplayLog(
   }
 
   // Step 4: Compare finish order
+  if (result.finishOrder.length !== log.finishOrder.length) {
+    return { valid: false, reason: `Finish order length mismatch: expected ${result.finishOrder.length}, got ${log.finishOrder.length}` };
+  }
   for (let i = 0; i < result.finishOrder.length; i++) {
     if (result.finishOrder[i].racerId !== log.finishOrder[i].racerId) {
       return {

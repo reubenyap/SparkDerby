@@ -13,10 +13,18 @@ export function useRaceWebSocket() {
   const connect = useCallback(() => {
     const socket = getSocket(sessionToken || undefined);
 
+    // Remove any previously attached listeners to prevent duplicates
+    socket.off('connect');
+    socket.off('tick_update');
+    socket.off('backing_received');
+    socket.off('race_finished');
+    socket.off('disconnect');
+
     socket.on('connect', () => {
       console.log('WebSocket connected');
-      if (race?.id) {
-        socket.emit('subscribe_race', { raceId: race.id });
+      const currentRace = useRaceStore.getState().race;
+      if (currentRace?.id) {
+        socket.emit('subscribe_race', { raceId: currentRace.id });
       }
     });
 
@@ -79,7 +87,7 @@ export function useRaceWebSocket() {
     });
 
     return socket;
-  }, [race?.id, sessionToken, setRace]);
+  }, [sessionToken, setRace]);
 
   useEffect(() => {
     const socket = connect();
@@ -87,4 +95,14 @@ export function useRaceWebSocket() {
       disconnectSocket();
     };
   }, [connect]);
+
+  // Re-subscribe when the race ID changes
+  useEffect(() => {
+    if (race?.id) {
+      const socket = getSocket(sessionToken || undefined);
+      if (socket.connected) {
+        socket.emit('subscribe_race', { raceId: race.id });
+      }
+    }
+  }, [race?.id, sessionToken]);
 }

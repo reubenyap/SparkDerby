@@ -99,9 +99,10 @@ export class ChainWatcherService implements OnModuleInit, OnModuleDestroy {
     if (this.running) return;
     this.running = true;
 
+    let lockAcquired = false;
     try {
       // Distributed lock – only one API instance polls at a time
-      const lockAcquired = await this.redis.setNX(
+      lockAcquired = await this.redis.setNX(
         ChainWatcherService.LOCK_KEY,
         '1',
         ChainWatcherService.LOCK_TTL_SECONDS,
@@ -179,7 +180,9 @@ export class ChainWatcherService implements OnModuleInit, OnModuleDestroy {
       this.logger.error(`Poll error: ${err}`);
     } finally {
       this.running = false;
-      await this.redis.del(ChainWatcherService.LOCK_KEY).catch(() => {});
+      if (lockAcquired) {
+        await this.redis.del(ChainWatcherService.LOCK_KEY).catch(() => {});
+      }
     }
   }
 
